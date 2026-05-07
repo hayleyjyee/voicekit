@@ -809,12 +809,19 @@ async function callClaude(prompt, maxTok = 1200) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: maxTok,
       messages: [{ role: 'user', content: prompt }]
     })
   });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(`API error ${resp.status}: ${err?.error?.message || resp.statusText}`);
+  }
   const data = await resp.json();
+  if (!data.content || !data.content[0] || !data.content[0].text) {
+    throw new Error('API 응답 형식 오류: ' + JSON.stringify(data));
+  }
   return data.content[0].text;
 }
 
@@ -843,13 +850,22 @@ JSON 배열만 출력 (마크다운, 설명 절대 없이):
 
   try {
     const result = await callClaude(prompt, 1800);
-    const clean = result.replace(/^```[\w]*\n?/,'').replace(/\n?```$/,'').trim();
+    // strip markdown fences and extract JSON array
+    let clean = result.replace(/^```[\w]*\n?/,'').replace(/\n?```$/,'').trim();
+    const arrMatch = clean.match(/\[[\s\S]*\]/);
+    if (arrMatch) clean = arrMatch[0];
     const rows = JSON.parse(clean);
     voiceChartData = rows;
     renderEditableVoiceChart(rows);
     document.getElementById('vchart-btns').style.display = 'flex';
   } catch(e) {
-    document.getElementById('vchart-area').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠</div><div class="empty-text">생성 중 오류가 발생했습니다. 다시 시도해주세요.</div></div>`;
+    console.error('Voice chart error:', e);
+    document.getElementById('vchart-area').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">⚠</div>
+        <div class="empty-text" style="margin-bottom:12px">생성 중 오류가 발생했습니다.<br><span style="font-size:11px;color:var(--ink-4)">${e.message}</span></div>
+        <button class="btn btn-mint" onclick="document.getElementById('vchart-area').innerHTML='<div class=\"loading-state\"><div class=\"loading-spinner\"></div>AI가 보이스 차트를 생성하고 있습니다...</div>';generateVoiceChart()" style="margin-top:8px">다시 시도하기</button>
+      </div>`;
   }
 }
 
@@ -915,7 +931,13 @@ NNG 톤: ${Object.values(m).join(', ')}
     renderGuide(guideData);
     document.getElementById('guide-btns').style.display = 'flex';
   } catch(e) {
-    document.getElementById('guide-area').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠</div><div class="empty-text">생성 중 오류가 발생했습니다. 이전 단계를 확인 후 다시 시도해주세요.</div></div>`;
+    console.error('Guide error:', e);
+    document.getElementById('guide-area').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">⚠</div>
+        <div class="empty-text" style="margin-bottom:12px">생성 중 오류가 발생했습니다.<br><span style="font-size:11px;color:var(--ink-4)">${e.message}</span></div>
+        <button class="btn btn-mint" onclick="document.getElementById('guide-area').innerHTML='<div class=\"loading-state\"><div class=\"loading-spinner\"></div>AI가 가이드를 구성하고 있습니다...</div>';generateGuide()" style="margin-top:8px">다시 시도하기</button>
+      </div>`;
   }
 }
 
@@ -1005,7 +1027,8 @@ JSON만 출력 (마크다운 없이):
     if (checkHistory.length > 5) checkHistory.pop();
     renderHistory();
   } catch(e) {
-    resultEl.innerHTML = `<div class="empty-state"><div class="empty-text">검수 중 오류가 발생했습니다.</div></div>`;
+    console.error('Check error:', e);
+    resultEl.innerHTML = `<div class="empty-state"><div class="empty-text">검수 중 오류가 발생했습니다.<br><span style="font-size:11px;color:var(--ink-4)">${e.message}</span></div></div>`;
   }
 }
 
