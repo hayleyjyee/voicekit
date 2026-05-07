@@ -171,6 +171,8 @@ a { color: inherit; text-decoration: none; }
 }
 .nav-item.active .nav-check { border-color: var(--mint); background: var(--mint); color: #fff; }
 .nav-item.done .nav-check { border-color: var(--ink-2); background: var(--ink-2); color: #fff; }
+.nav-item.locked { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+.step-pip.locked { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
 
 .content-area { padding: 2.5rem; }
 
@@ -720,6 +722,14 @@ const maxStep = 5;
 
 // ── Init ──
 updateMatrix();
+// Apply initial locked state after DOM ready
+// lock steps 2-5 on first load (script is at body end so DOM is ready)
+[2,3,4,5].forEach(n => {
+  const ni = document.getElementById('ni'+n);
+  const sp = document.getElementById('sp'+n);
+  if (ni) ni.classList.add('locked');
+  if (sp) sp.classList.add('locked');
+});
 document.querySelectorAll('.trait-opt').forEach(opt => {
   opt.addEventListener('click', () => {
     const name = opt.querySelector('input').name;
@@ -739,26 +749,50 @@ function updateMatrix() {
 }
 
 // ── Navigation ──
+// ── Step unlock tracking ──
+// maxUnlocked: the highest step the user has legitimately reached
+let maxUnlocked = 1;
+
+function isStepUnlocked(n) {
+  return n <= maxUnlocked;
+}
+
 function goStep(n) {
+  if (!isStepUnlocked(n)) {
+    showNotif('이전 단계를 먼저 완료해주세요.');
+    return;
+  }
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel'+n).classList.add('active');
 
   document.querySelectorAll('.nav-item').forEach((item, i) => {
-    item.classList.remove('active');
-    if (i+1 < n) { item.classList.add('done'); document.getElementById('nc'+(i+1)).textContent = '✓'; }
-    else if (i+1 === n) { item.classList.add('active'); document.getElementById('nc'+(i+1)).textContent = ''; }
-    else { item.classList.remove('done'); document.getElementById('nc'+(i+1)).textContent = ''; }
+    const sn = i + 1;
+    item.classList.remove('active', 'done', 'locked');
+    if (sn < n)        { item.classList.add('done');   document.getElementById('nc'+sn).textContent = '✓'; }
+    else if (sn === n) { item.classList.add('active'); document.getElementById('nc'+sn).textContent = ''; }
+    else if (isStepUnlocked(sn)) { document.getElementById('nc'+sn).textContent = ''; }
+    else               { item.classList.add('locked'); document.getElementById('nc'+sn).textContent = ''; }
   });
 
   document.querySelectorAll('.step-pip').forEach((pip, i) => {
-    pip.classList.remove('active', 'done');
-    if (i+1 < n) pip.classList.add('done');
-    else if (i+1 === n) pip.classList.add('active');
+    const sn = i + 1;
+    pip.classList.remove('active', 'done', 'locked');
+    if (sn < n)        pip.classList.add('done');
+    else if (sn === n) pip.classList.add('active');
+    else if (!isStepUnlocked(sn)) pip.classList.add('locked');
   });
 
   document.getElementById('heroSection').style.display = n === 1 ? 'block' : 'none';
   currentStep = n;
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function unlockStep(n) {
+  if (n > maxUnlocked) {
+    maxUnlocked = n;
+    // re-render nav to reflect new unlock state
+    goStep(currentStep);
+  }
 }
 
 async function nextStep(from) {
@@ -770,14 +804,28 @@ async function nextStep(from) {
       showNotif('모든 브랜드 성격 항목을 선택해주세요.');
       return;
     }
+    unlockStep(2);
     goStep(2);
   } else if (from === 2) {
+    unlockStep(3);
     goStep(3);
     await generateVoiceChart();
   } else if (from === 3) {
+    // only unlock 4 after voice chart actually generated
+    if (!voiceChartData || voiceChartData.length === 0) {
+      showNotif('보이스 차트가 아직 생성되지 않았습니다.');
+      return;
+    }
+    unlockStep(4);
     goStep(4);
     await generateGuide();
   } else if (from === 4) {
+    // only unlock 5 after guide generated
+    if (!guideData) {
+      showNotif('라이팅 가이드가 아직 생성되지 않았습니다.');
+      return;
+    }
+    unlockStep(5);
     goStep(5);
     renderCheckTags();
   }
