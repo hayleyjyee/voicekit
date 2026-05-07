@@ -852,10 +852,23 @@ function getMatrix() {
 }
 
 // ── Claude API ──
+
+function retryVoiceChart() {
+  document.getElementById('vchart-area').innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>AI가 보이스 차트를 생성하고 있습니다...</div>';
+  generateVoiceChart();
+}
+function retryGuide() {
+  document.getElementById('guide-area').innerHTML = '<div class="loading-state"><div class="loading-spinner"></div>AI가 가이드를 구성하고 있습니다...</div>';
+  generateGuide();
+}
+
 async function callClaude(prompt, maxTok = 1200) {
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'anthropic-dangerous-request-allow-browser': 'true'
+    },
     body: JSON.stringify({
       model: 'claude-sonnet-4-5',
       max_tokens: maxTok,
@@ -912,7 +925,7 @@ JSON 배열만 출력 (마크다운, 설명 절대 없이):
       <div class="empty-state">
         <div class="empty-icon">⚠</div>
         <div class="empty-text" style="margin-bottom:12px">생성 중 오류가 발생했습니다.<br><span style="font-size:11px;color:var(--ink-4)">${e.message}</span></div>
-        <button class="btn btn-mint" onclick="document.getElementById('vchart-area').innerHTML='<div class=\"loading-state\"><div class=\"loading-spinner\"></div>AI가 보이스 차트를 생성하고 있습니다...</div>';generateVoiceChart()" style="margin-top:8px">다시 시도하기</button>
+        <button class="btn btn-mint" onclick="retryVoiceChart()" style="margin-top:8px">다시 시도하기</button>
       </div>`;
   }
 }
@@ -984,7 +997,7 @@ NNG 톤: ${Object.values(m).join(', ')}
       <div class="empty-state">
         <div class="empty-icon">⚠</div>
         <div class="empty-text" style="margin-bottom:12px">생성 중 오류가 발생했습니다.<br><span style="font-size:11px;color:var(--ink-4)">${e.message}</span></div>
-        <button class="btn btn-mint" onclick="document.getElementById('guide-area').innerHTML='<div class=\"loading-state\"><div class=\"loading-spinner\"></div>AI가 가이드를 구성하고 있습니다...</div>';generateGuide()" style="margin-top:8px">다시 시도하기</button>
+        <button class="btn btn-mint" onclick="retryGuide()" style="margin-top:8px">다시 시도하기</button>
       </div>`;
   }
 }
